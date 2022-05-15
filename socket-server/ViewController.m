@@ -79,7 +79,7 @@ dispatch_sync(dispatch_get_main_queue(), block);\
     NSLog(@"当前客户端的IP:%@,端口号:%d",newSocket.connectedHost,newSocket.connectedPort);
     [self.clientSockets addObject:newSocket];
     NSLog(@"当前有%ld个客户端连接",self.clientSockets.count);
-    [newSocket readDataWithTimeout:5 tag:0];
+    [newSocket readDataWithTimeout:-1 tag:0];
 }
 
 - (void)socketDidDisconnect:(GCDAsyncSocket *)sock withError:(NSError *)err{
