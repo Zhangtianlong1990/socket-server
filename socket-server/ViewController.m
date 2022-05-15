@@ -12,12 +12,12 @@
 #define VA_COMADN_HEARTBEAT_ID 0x00000002
 #define server_port 6969
 
-#define dispatch_main_sync_safe(block)\
-if ([NSThread isMainThread]) {\
-block();\
-} else {\
-dispatch_sync(dispatch_get_main_queue(), block);\
-}
+#define dispatch_main_async_safe(block)\
+    if ([NSThread isMainThread]) {\
+        block();\
+    } else {\
+        dispatch_async(dispatch_get_main_queue(), block);\
+    }
 
 @interface ViewController ()<GCDAsyncSocketDelegate>
 @property (nonatomic,strong) GCDAsyncSocket *serverSocket;
@@ -26,6 +26,7 @@ dispatch_sync(dispatch_get_main_queue(), block);\
 @property (nonatomic,assign) unsigned int totalSize;
 @property (nonatomic,assign) unsigned int currentCommandId;
 @property (nonatomic,weak) UIImageView *imageView;
+@property (nonatomic,strong) NSTimer *heartBeatRemainTimer;
 @end
 
 @implementation ViewController
@@ -58,6 +59,40 @@ dispatch_sync(dispatch_get_main_queue(), block);\
     }
 }
 
+//初始化心跳
+- (void)initHeartBeat
+{
+ 
+    dispatch_main_async_safe(^{
+ 
+        [self destoryHeartBeat];
+ 
+        __weak typeof(self) weakSelf = self;
+        //心跳设置为3分钟，NAT超时一般为5分钟
+        //客户端超过5分钟没有发送心跳包就disconnect了
+        self.heartBeatRemainTimer = [NSTimer scheduledTimerWithTimeInterval:5*60 repeats:NO block:^(NSTimer * _Nonnull timer) {
+            NSLog(@"heart Beat time out");
+            //和服务端约定好发送什么作为心跳标识，尽可能的减小心跳包大小
+            [weakSelf disConnect];
+        }];
+        [[NSRunLoop currentRunLoop]addTimer:self.heartBeatRemainTimer forMode:NSRunLoopCommonModes];
+    })
+ 
+}
+
+//取消心跳
+- (void)destoryHeartBeat
+{
+    dispatch_main_async_safe(^{
+        if (self.heartBeatRemainTimer) {
+            [self.heartBeatRemainTimer invalidate];
+            self.heartBeatRemainTimer = nil;
+            NSLog(@"heartBeat Timer destory");
+        }
+    })
+ 
+}
+
 - (BOOL)accept{
     NSError *error = nil;
     BOOL success = [_serverSocket acceptOnPort:server_port error:&error];
@@ -80,11 +115,14 @@ dispatch_sync(dispatch_get_main_queue(), block);\
     NSLog(@"当前客户端的IP:%@,端口号:%d",newSocket.connectedHost,newSocket.connectedPort);
     [self.clientSockets addObject:newSocket];
     NSLog(@"当前有%ld个客户端连接",self.clientSockets.count);
+    [self initHeartBeat];
     [newSocket readDataWithTimeout:-1 tag:0];
 }
 
 - (void)socketDidDisconnect:(GCDAsyncSocket *)sock withError:(NSError *)err{
     NSLog(@"断开连接,errorCode = %ld,err.localizedDescription = %@",err.code,err.localizedDescription);
+    //断开连接时销毁心跳
+    [self destoryHeartBeat];
 }
 
 - (void)socket:(GCDAsyncSocket *)sock didReadData:(NSData *)data withTag:(long)tag{
@@ -162,13 +200,15 @@ dispatch_sync(dispatch_get_main_queue(), block);\
 - (void)saveImage{
     NSData *imageData = [self.dataM subdataWithRange:NSMakeRange(8, self.dataM.length-8)];
     UIImage *acceptImage = [UIImage imageWithData:imageData];
-    dispatch_main_sync_safe(^{
+    dispatch_main_async_safe(^{
         self.imageView.image = acceptImage;
     });
     self.dataM = nil;
 }
 
 - (void)handleHeartBeat{
+    //接收到心跳包，重置定时器
+    [self initHeartBeat];
     self.dataM = nil;
 }
 
