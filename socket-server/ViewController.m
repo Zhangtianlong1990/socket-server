@@ -83,7 +83,7 @@ dispatch_sync(dispatch_get_main_queue(), block);\
 }
 
 - (void)socketDidDisconnect:(GCDAsyncSocket *)sock withError:(NSError *)err{
-    NSLog(@"断开连接%@",err.localizedDescription);
+    NSLog(@"断开连接,errorCode = %ld,err.localizedDescription = %@",err.code,err.localizedDescription);
 }
 
 - (void)socket:(GCDAsyncSocket *)sock didReadData:(NSData *)data withTag:(long)tag{
