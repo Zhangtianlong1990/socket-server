@@ -9,6 +9,7 @@
 #import "GCDAsyncSocket.h"
 
 #define VA_COMADN_ID 0x00000001
+#define VA_COMADN_HEARTBEAT_ID 0x00000002
 #define server_port 6969
 
 #define dispatch_main_sync_safe(block)\
@@ -106,7 +107,9 @@ dispatch_sync(dispatch_get_main_queue(), block);\
             case VA_COMADN_ID:
                 NSLog(@"此次数据是图片类型");
                 break;
-                
+            case VA_COMADN_HEARTBEAT_ID:
+                NSLog(@"此次数据是心跳包");
+                break;
             default:
                 NSLog(@"未知");
                 break;
@@ -123,6 +126,8 @@ dispatch_sync(dispatch_get_main_queue(), block);\
         NSLog(@"数据已经接收完成");
         if (self.currentCommandId == VA_COMADN_ID) {
             [self saveImage];
+        }else if (self.currentCommandId == VA_COMADN_HEARTBEAT_ID){
+            [self handleHeartBeat];
         }
         //响应客户端
     }
@@ -160,6 +165,11 @@ dispatch_sync(dispatch_get_main_queue(), block);\
     dispatch_main_sync_safe(^{
         self.imageView.image = acceptImage;
     });
+    self.dataM = nil;
+}
+
+- (void)handleHeartBeat{
+    self.dataM = nil;
 }
 
 #pragma mark - UI
